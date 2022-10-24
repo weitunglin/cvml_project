@@ -1,5 +1,4 @@
 import cv2
-import mayavi.mlab as mlab
 import numpy as np
 
 
@@ -62,16 +61,39 @@ class Box3D(object):
 # Projections
 # =========================================================
 def project_velo_to_cam2(calib):
-    P_velo2cam_ref = np.vstack((calib['Tr_front_bottom_60_to_lidar'].reshape(3, 4), np.array([0., 0., 0., 1.])))  # velo2ref_cam
-    P_velo2cam_ref = np.linalg.inv(P_velo2cam_ref)
+    """
+    original
+    """
+    """
+    P_velo2cam_ref = np.vstack((calib['Tr_velo_to_cam'].reshape(3, 4), np.array([0., 0., 0., 1.])))  # velo2ref_cam
     R_ref2rect = np.eye(4)
     R0_rect = calib['R0_rect'].reshape(3, 3)  # ref_cam2rect
     R_ref2rect[:3, :3] = R0_rect
+    P_rect2cam2 = calib['P2'].reshape((3, 4))
+    proj_mat = P_rect2cam2 @ R_ref2rect @ P_velo2cam_ref
+    print("proj_mat: ")
+    print(proj_mat)
+    return proj_mat
+    """
+
+    P_velo2cam = np.vstack((calib['front_bottom_60_extrinsic'].reshape(3, 4), np.array([0., 0., 0., 1.])))  # velo2ref_cam
+    P_cam = np.eye(4)
+    P_cam_ = calib['front_bottom_60_intrinsic'].reshape(3, 3)  # ref_cam2rect
+    P_cam[:3, :3] = P_cam_
     # P_rect2cam2 = calib['P2'].reshape((3, 4))
+    proj_mat = P_cam @ P_velo2cam
     # proj_mat = P_rect2cam2 @ R_ref2rect @ P_velo2cam_ref
-    proj_mat = R_ref2rect @ P_velo2cam_ref
+    print("proj_mat: ")
+    print(proj_mat)
     return proj_mat
 
+    # proj_mat = calib['Tr_front_bottom_60_to_lidar'].reshape(3, 4)  # velo2ref_cam
+    # a = np.array([618.175335, 0, 273.771329, 0, 611.31756, 204.595871, 0, 0, 1]).reshape((3, 3))
+    # b = np.array([-0.0585477232287393, -0.9980077885482712, 0.0235078306468276, 0.09653148462462031, 0.01993650590000778, -0.0247124471717397, -0.9994957882288864, -2.241561306526251, 0.9980855172966042, -0.05804953877312857, 0.02134364568196223, 0.3237799271578172]).reshape((3,4))
+    # proj_mat = np.dot(a, b)
+    # print("proj_mat: ")
+    # print(proj_mat)
+    return proj_mat
 
 def project_cam2_to_velo(calib):
     R_ref2rect = np.eye(4)
@@ -96,9 +118,17 @@ def project_to_image(points, proj_mat):
     """
     num_pts = points.shape[1]
 
+    print("pts 3d transpose: ")
+    print(points.shape)
     # Change to homogenous coordinate
     points = np.vstack((points, np.ones((1, num_pts))))
-    points = proj_mat @ points
+    print("pts 3d homogenous: ")
+    print(points.shape)
+    points = np.dot(proj_mat, points)
+    print("pts 3d projected: ")
+    print(points.shape)
+    print("pts 2d: ")
+    print(points)
     points[:2, :] /= points[2, :]
     return points[:2, :]
 
@@ -152,7 +182,12 @@ def load_image(img_filename):
 def load_velo_scan(velo_filename):
     scan = np.fromfile(velo_filename, dtype=np.float32)
     scan = scan.reshape((-1, 4))
-    return scan
+    # print(scan.shape)
+    print(scan)
+    # new_scan = np.stack((scan[:, 1], scan[:, 2], -scan[:, 0], scan[:, 3]), axis=1)
+    new_scan = scan
+    print(new_scan.shape)
+    return new_scan
 
 
 def read_calib_file(filepath):
